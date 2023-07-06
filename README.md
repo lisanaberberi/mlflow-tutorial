@@ -4,20 +4,36 @@
 
 ## Getting started
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+This is a basic tutorial intorducing you into MLFlow framework
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## Prerequisites
 
+### Main installation
+you have:
+* python3 > 3.7 but lower than 3.11
+* pip is installed
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+### (Optional) Install favorite virtual environment
+For example:
+* `sudo apt install python3-virtualenv`
+* `python3 -m venv path/to/mlflow-venv`
+* `source mlflow-venv/bin/activate`
+* (to stop virtualenv) `deactivate`
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+### Install jupyter
+* jupyter has to be installed to run notebooks: e.g. `pip install jupyterlab` or `pip install notebook`
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### Install dependencies from the requirements.txt
+* run `pip install -r requirements.txt`
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+The code uses in the notebook uses pandas, matplotlib, tensorflow but all that packages should be installed when you install tensorflow itself.
+
+## Jupyter Notebook
+
+Start the provided notebook `mlflow_recasting_app_vX.ipynb` and follow the steps.
+
+## Acknowledgment
+This work is co-funded by AI4EOSC project that has received funding from the European Union's Horizon Europe 2022 research and innovation programme under agreement No 101058593
 
 ## License
 For open source projects, say how it is licensed.

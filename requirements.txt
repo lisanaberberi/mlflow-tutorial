@@ -1,0 +1,4 @@
+# you must have Tensorflow, comment if already installed!
+tensorflow
+mlflow[extras]
+requests
