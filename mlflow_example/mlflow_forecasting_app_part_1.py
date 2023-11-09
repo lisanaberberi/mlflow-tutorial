@@ -102,9 +102,9 @@ def train_keras_model(X, y):
   model.add(Dense(1))
   model.compile(loss="mse", optimizer="adam")
 
-  model.fit(X_train, y_train, epochs=100, batch_size=64, validation_split=.2)
+  history=model.fit(X_train, y_train, epochs=100, batch_size=64, validation_split=.2)
 
-  return model
+  return model, history
 
 
 # #### MLflow part
@@ -118,18 +118,38 @@ import getpass
 # IMPORTANT CONSTANTS TO DEFINE
 # MLFLOW CREDENTIALS (Nginx). PUT REAL ONES!
 # for direct API calls via HTTP we need to inject credentials
-MLFLOW_TRACKING_USERNAME = 'lisana.berberi@kit.edu'
+MLFLOW_TRACKING_USERNAME = input('Enter your username: ')
 MLFLOW_TRACKING_PASSWORD =  getpass.getpass()  # inject password by typing manually
 # for MLFLow-way we have to set the following environment variables
 os.environ['MLFLOW_TRACKING_USERNAME'] = MLFLOW_TRACKING_USERNAME
 os.environ['MLFLOW_TRACKING_PASSWORD'] = MLFLOW_TRACKING_PASSWORD
 
+os.system('git config --get remote.origin.url')
+
+import subprocess
+# Run the git command and capture the output
+result = subprocess.run(["git", "config", "--get", "remote.origin.url"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+# Check if the command was successful
+if result.returncode == 0:
+    # Get the output of the command
+    git_url = result.stdout
+
+    # Write the output to a text file
+    with open("git_repo_url.txt", "w") as f:
+        f.write(git_url)
+else:
+    # Handle any errors or log them
+    error_message = result.stderr
+    print(f"Error: {error_message}")
+
+
 # Remote MLFlow server
 MLFLOW_REMOTE_SERVER="https://mlflow.dev.ai4eosc.eu" 
 # Name of the experiment (e.g. name of the  code repository)
-MLFLOW_EXPERIMENT_NAME="wind_power_forecast_L"
+MLFLOW_EXPERIMENT_NAME="wind_power_forecast_W"
 # Name of the model to train. HAS TO BE UNIQUE, Please, DEFINE ONE!
-MLFLOW_MODEL_NAME="Wind_Forecast_L"
+MLFLOW_MODEL_NAME="Wind_Forecast_W"
 
 
 # Train the model and use MLflow to log and track its parameters, metrics, artifacts, and source code.
@@ -160,19 +180,35 @@ with mlflow.start_run():
   # Automatically capture the model's parameters, metrics, artifacts,and source code with the `autolog()` function
 
   mlflow.log_input(dataset, context="training")
+
+    # Log the parameters
+  mlflow.log_params({
+      "hidden_units": 100,
+      "activation": "relu",
+      "epochs": 100,
+      "batch_size": 64,
+      "validation_split": 0.2
+  })
+
   #mlflow.tensorflow.autolog()  
-  model=train_keras_model(X_train, y_train)
+  model, history=train_keras_model(X_train, y_train)
   
   #Log the MLProject file
-  mlflow.log_artifacts('./MLproject',artifact_path="MLProject")
-  mlflow.log_artifact('./MLproject',artifact_path="MLProject")
+  mlflow.log_artifact('mlflow_example/MLproject',artifact_path="MLProject")
+  mlflow.log_artifact('mlflow_example/',artifact_path="MLProject")
 
+  
+    # Log the metrics
+  mlflow.log_metrics({
+      "train_loss": history.history["loss"][-1],
+      "val_loss": history.history["val_loss"][-1]
+  })
   #log the signature
 
   # Infer the input and output schemas
-  input_schema = Schema([ColSpec("double", feature_name) for feature_name in X_train.columns])
-  output_schema = Schema([ColSpec("double", "predicted_power")])
-  signature = ModelSignature(inputs=input_schema, outputs=output_schema)
+  #input_schema = Schema([ColSpec("double", feature_name) for feature_name in X_train.columns])
+  #output_schema = Schema([ColSpec("double", "predicted_power")])
+  #signature = ModelSignature(inputs=input_schema, outputs=output_schema)
 
  #Save the Keras model as a TensorFlow SavedModel
   model.save("my_keras_model")

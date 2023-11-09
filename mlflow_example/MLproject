@@ -4,4 +4,4 @@ python_env: python_env.yaml
 
 entry_points:
   main:
-    command: "python mlflow_forecasting_app_v1.2.py"
+    command: "python mlflow_forecasting_app_part_1.py"
