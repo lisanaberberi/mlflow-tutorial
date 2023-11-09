@@ -124,7 +124,6 @@ MLFLOW_TRACKING_PASSWORD =  getpass.getpass()  # inject password by typing manua
 os.environ['MLFLOW_TRACKING_USERNAME'] = MLFLOW_TRACKING_USERNAME
 os.environ['MLFLOW_TRACKING_PASSWORD'] = MLFLOW_TRACKING_PASSWORD
 
-os.system('git config --get remote.origin.url')
 
 import subprocess
 # Run the git command and capture the output
@@ -136,8 +135,9 @@ if result.returncode == 0:
     git_url = result.stdout
 
     # Write the output to a text file
-    with open("git_repo_url.txt", "w") as f:
-        f.write(git_url)
+    with open("mlflow_example/links.txt", "w") as f:
+        lines = ["Git Repo URL: ", git_url, "\n", "Dataset URL: ", data_source_url,"\n" ]
+        f.writelines(lines)
 else:
     # Handle any errors or log them
     error_message = result.stderr
@@ -159,9 +159,9 @@ import mlflow.keras
 import mlflow.tensorflow
 from mlflow.data.pandas_dataset import PandasDataset
 
-from mlflow.models.signature import ModelSignature
-from mlflow.types.schema import Schema, ColSpec
-from mlflow.projects import _EnvManager
+from mlflow.models.signature import infer_signature
+#from mlflow.models.signature import ModelSignature
+#from mlflow.types.schema import Schema, ColSpec
 
 X_train, y_train = get_training_data()
 
@@ -193,30 +193,28 @@ with mlflow.start_run():
   #mlflow.tensorflow.autolog()  
   model, history=train_keras_model(X_train, y_train)
   
-  #Log the MLProject file
-  mlflow.log_artifact('mlflow_example/MLproject',artifact_path="MLProject")
-  mlflow.log_artifact('mlflow_example/',artifact_path="MLProject")
+  #Log the project info
+  mlflow.log_artifact('mlflow_example/MLproject',artifact_path="project-info")
+  mlflow.log_artifact('mlflow_example/links.txt',artifact_path="project-info")
 
-  
     # Log the metrics
   mlflow.log_metrics({
       "train_loss": history.history["loss"][-1],
       "val_loss": history.history["val_loss"][-1]
   })
-  #log the signature
-
+ 
   # Infer the input and output schemas
-  #input_schema = Schema([ColSpec("double", feature_name) for feature_name in X_train.columns])
-  #output_schema = Schema([ColSpec("double", "predicted_power")])
-  #signature = ModelSignature(inputs=input_schema, outputs=output_schema)
+
+  # Assuming you have a DataFrame named 'X_train' with the training data
+  #input_signature, output_signature = infer_signature(X_train)
+  infer_signature(X_train)
+
 
  #Save the Keras model as a TensorFlow SavedModel
   model.save("my_keras_model")
 
   # Log the TensorFlow SavedModel using mlflow.tensorflow.log_model
   mlflow.tensorflow.log_model(model, artifact_path="source-files")
-  
-  #mlflow.log_artifact('./my_keras_model/',artifact_path="MLProject")
 
   # Retrieve the run, including dataset information
   run = mlflow.get_run(mlflow.last_active_run().info.run_id)
@@ -226,6 +224,14 @@ with mlflow.start_run():
   print(f"Dataset digest: {dataset_info.digest}")
   print(f"Dataset profile: {dataset_info.profile}")
   print(f"Dataset schema: {dataset_info.schema}")
+
+  #Log the dataset ready for download
+  # Save the DataFrame to a CSV file
+  data_csv = "windfarm_data.csv"
+  wind_farm_data.to_csv(data_csv, index=False)
+
+  # Log the CSV file as an artifact in MLflow
+  mlflow.log_artifact(data_csv, artifact_path='source-files/data/dataset')
 
 # Print the run_id
 print(F"\nRUN_ID: {run_id} \n")
