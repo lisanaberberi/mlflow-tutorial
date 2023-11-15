@@ -16,9 +16,12 @@ print(f'Tensorflow version = {tf.__version__}\n')
 # 
 # ## 2. MLflow Components
 # 
-# The MLflow Model Registry component is a centralized model store, set of APIs, and UI, to collaboratively manage the full lifecycle of MLflow Models. It provides model lineage (which MLflow Experiment and Run produced the model), model versioning, stage transitions, annotations, and deployment management.
+# The MLflow Model Registry component is a centralized model store, set of APIs, and UI, to collaboratively manage the 
+# full lifecycle of MLflow Models. It provides model lineage (which MLflow Experiment and Run produced the model), 
+# model versioning, stage transitions, annotations, and deployment management.
 # 
-# In this notebook, you use each of the MLflow Model Registry's components to develop and manage a production machine learning application. This notebook covers the following topics:
+# In this notebook, you use each of the MLflow Model Registry's components to develop and manage a production ML application. 
+# This script covers the following topics:
 # * Log model experiments with MLflow
 # * Register models with the Model Registry
 # * Add model description and version the model stage transitions
@@ -28,7 +31,9 @@ print(f'Tensorflow version = {tf.__version__}\n')
 # ## 2.1 ML Application Example using MLFlow
 # ## Load the dataset
 # 
-# The following cells load a dataset containing weather data and power output information for a wind farm in the United States. The dataset contains wind direction, wind speed, and air temperature features sampled every eight hours (once at 00:00, once at 08:00, and once at 16:00), as well as daily aggregate power output (power), over several years.
+# The following cells load a dataset containing weather data and power output information for a wind farm in the United States. 
+# The dataset contains wind direction, wind speed, and air temperature features sampled every eight hours 
+# (once at 00:00, once at 08:00, and once at 16:00), as well as daily aggregate power output (power), over several years.
 # 
 
 import pandas as pd
@@ -76,7 +81,8 @@ wind_farm_data["2019-01-01":"2019-02-01"]
 
 # ## Train a power forecasting model and track it with MLflow
 # 
-# The following cells train a neural network to predict power output based on the weather features in the dataset. MLflow is used to track the model's hyperparameters, performance metrics, source code, and artifacts.
+# The following cells train a neural network to predict power output based on the weather features in the dataset. 
+# MLflow is used to track the model's hyperparameters, performance metrics, source code, and artifacts.
 # 
 
 # #### 2. Define a power forecasting model using TensorFlow Keras.
@@ -138,18 +144,29 @@ if result.returncode == 0:
     with open("mlflow_example/links.txt", "w") as f:
         lines = ["Git Repo URL: ", git_url, "\n", "Dataset URL: ", data_source_url,"\n" ]
         f.writelines(lines)
+        f.close()
 else:
     # Handle any errors or log them
     error_message = result.stderr
     print(f"Error: {error_message}")
 
+import contextlib
+# Function to capture the model summary in a file
+def log_model_summary(model, summary_file):
+  with open(summary_file, 'w') as f, contextlib.redirect_stdout(f):
+      model.summary()
+  return summary_file
 
 # Remote MLFlow server
 MLFLOW_REMOTE_SERVER="https://mlflow.dev.ai4eosc.eu" 
+
+#Set the MLflow server and backend and artifact stores
+mlflow.set_tracking_uri(MLFLOW_REMOTE_SERVER)
+
 # Name of the experiment (e.g. name of the  code repository)
 MLFLOW_EXPERIMENT_NAME="wind_power_forecast_W"
 # Name of the model to train. HAS TO BE UNIQUE, Please, DEFINE ONE!
-MLFLOW_MODEL_NAME="Wind_Forecast_W"
+MLFLOW_MODEL_NAME="wind-forecast-seq-model-v3.0"
 
 
 # Train the model and use MLflow to log and track its parameters, metrics, artifacts, and source code.
@@ -159,14 +176,7 @@ import mlflow.keras
 import mlflow.tensorflow
 from mlflow.data.pandas_dataset import PandasDataset
 
-from mlflow.models.signature import infer_signature
-#from mlflow.models.signature import ModelSignature
-#from mlflow.types.schema import Schema, ColSpec
-
 X_train, y_train = get_training_data()
-
-#Set the MLflow server and backend and artifact stores
-mlflow.set_tracking_uri(MLFLOW_REMOTE_SERVER)
 
 #set an experiment name for all different runs
 mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
@@ -204,17 +214,44 @@ with mlflow.start_run():
   })
  
   # Infer the input and output schemas
+  from mlflow.models import ModelSignature
+  from mlflow.types.schema import Schema, TensorSpec
+  import mlflow.types as types
+  import numpy as np
 
-  # Assuming you have a DataFrame named 'X_train' with the training data
-  #input_signature, output_signature = infer_signature(X_train)
-  infer_signature(X_train)
+  # Assuming X_train is your input data (Pandas DataFrame or NumPy array)
+  #input_columns = [{"name": feature_name, "type": "double"} for feature_name in X_train.columns]
+  # Add more features to the input_columns list
+  #additional_features = ["wind_direction_00", "wind_speed_00", "wind_speed_08"]
+  #input_columns += [{"name": feature_name, "type": "double"} for feature_name in input_columns]
 
+  # Assuming X_train is your input data (Pandas DataFrame or NumPy array)
+  input_columns = X_train.columns.tolist()
+  output_columns = y_train
+  print("input col", input_columns)
+  print("\n output col", output_columns)
+  # Create a model signature
+  input_columns = X_train.columns.tolist()
+  input_shape = (-1, len(input_columns))  # Shape based on the number of input features
+  input_schema = Schema([TensorSpec(np.dtype(np.float64), input_shape, name=feature) for feature in input_columns])
+  output_shape = (-1, len(output_columns)) 
 
+  output_schema = Schema([TensorSpec(np.dtype(np.float64), output_shape, name="power")])
+
+  signature = ModelSignature(inputs=input_schema, outputs=output_schema)
+
+  print("\nsignature", signature)
  #Save the Keras model as a TensorFlow SavedModel
-  model.save("my_keras_model")
+  #model.save("my_keras_model")
 
-  # Log the TensorFlow SavedModel using mlflow.tensorflow.log_model
-  mlflow.tensorflow.log_model(model, artifact_path="source-files")
+  # Log the TensorFlow using mlflow.tensorflow.log_model
+  mlflow.tensorflow.log_model(model, artifact_path='artifacts', signature=signature)
+
+  # Set the name of the summary file
+  summary_file = "model_summary.txt"
+  # Log the model summary to the file
+  log_model_summary(model, summary_file)
+  mlflow.log_artifact(summary_file, artifact_path='model-summary')
 
   # Retrieve the run, including dataset information
   run = mlflow.get_run(mlflow.last_active_run().info.run_id)
@@ -234,125 +271,52 @@ with mlflow.start_run():
   mlflow.log_artifact(data_csv, artifact_path='source-files/data/dataset')
 
 # Print the run_id
-print(F"\nRUN_ID: {run_id} \n")
+print(f"\nRUN_ID: {run_id} \n")
 
 
-# ### Register the model with the MLflow Model Registry API
-# 
-# Now that a forecasting model has been trained and tracked with MLflow, the next step is to register it with the MLflow Model Registry. You can register and manage models using the MLflow UI or the MLflow API .
-# 
-# The following cells use the API to register your forecasting model, add rich model descriptions, and perform stage transitions. See the documentation for the UI workflow.
-
-# Create a new registered model using the API
-# 
-# The following cells use the `mlflow.register_model()` function to create a new registered model whose name begins with the string defined in `MLFLOW_MODEL_NAME`. This also creates a new model version (for example, Version 1 of power-forecasting-model).
-# +-***************************************************************************
-
-# The default path where the MLflow autologging function stores the model
-model_uri = F"runs:/{run_id}/model"
-model_details = mlflow.register_model(model_uri=model_uri, name=MLFLOW_MODEL_NAME)
+# ### REGISTER MODEL to MODEL REGISTRY
+result = mlflow.register_model(
+    f"runs:/{run_id}/artifacts/", MLFLOW_MODEL_NAME
+)
 
 
-import time
-from mlflow.tracking.client import MlflowClient
-from mlflow.entities.model_registry.model_version_status import ModelVersionStatus
 
-
-def wait_until_ready(model_name, model_version):
-  client = MlflowClient()
-  for _ in range(10):
-    model_version_details = client.get_model_version(
-      name=MLFLOW_MODEL_NAME,
-      version=model_version,
-    )
-    status = ModelVersionStatus.from_string(model_version_details.status)
-    print("Model status: %s" % ModelVersionStatus.to_string(status))
-    if status == ModelVersionStatus.READY:
-      break
-    time.sleep(1)
-
-
-wait_until_ready(model_details.name, model_details.version)
-
-# ### Add model descriptions
-
-# Add a high-level description to the registered model, including the machine learning problem and dataset.
+## Fetch the latest model from the Model Registry
 
 from mlflow.tracking.client import MlflowClient
-
 client = MlflowClient()
-client.update_registered_model(
-  name=model_details.name,
-  description="This model forecasts the power output of a wind farm based on weather data. The weather data consists of three features: wind speed, wind direction, and air temperature. // user"
-)
-
-# Perform a model staging using RestAPI
-# First need to check if api is working:
-# http://   /api/2.0/mlflow
-# 
-# restapi tutorial to transition stage: https://mlflow.org/docs/latest/rest-api.html#transition-modelversion-stage
-# 
-# 
-
-# Let's use requests library to perform API call
-import requests
-from requests.auth import HTTPBasicAuth
-
-# Get info about the run
-auth=HTTPBasicAuth(MLFLOW_TRACKING_USERNAME, MLFLOW_TRACKING_PASSWORD)
-headers = {'content-type': 'application/json'}
-params = { 'run_id' : run_id }
-url = MLFLOW_REMOTE_SERVER + "/api/2.0/mlflow/runs/get"
-response = requests.get(url, auth=auth, headers=headers, params=params)
-response.json()
-
-# Transition model to Production using API call
-auth=HTTPBasicAuth(MLFLOW_TRACKING_USERNAME, MLFLOW_TRACKING_PASSWORD)
-headers = {'content-type': 'application/json'}
-data = {"comment": "Please move this model into production!", 
-        "name": MLFLOW_MODEL_NAME, 
-        "version": "1", 
-        "stage": "Production"}
-url = MLFLOW_REMOTE_SERVER + "/api/2.0/mlflow/model-versions/transition-stage"
-
-response = requests.post(url, auth=auth, headers=headers, json=data)
-response.json()
-
-# or using the script:
-
-client.transition_model_version_stage(
-  name=model_details.name,
-  version=model_details.version,
-  stage='Production'
-
-)
-
-# Use the `MlflowClient.get_model_version()` function to fetch the model's current stage.
-
-model_version_details = client.get_model_version(
-  name=model_details.name,
-  version=model_details.version,
-)
-
-print(F"The current model stage is: '{model_version_details.current_stage}'")
-
-# The MLflow Model Registry allows multiple model versions to share the same stage. When referencing a model by stage, the Model Registry will use the latest model version (the model version with the largest version ID). The MlflowClient.get_latest_versions() function fetches the latest model version for a given stage or set of stages. The following cell uses this function to print the latest version of the power forecasting model that is in the Production stage.
-latest_version_info = client.get_latest_versions(MLFLOW_MODEL_NAME, stages=["Production"])
-latest_production_version = latest_version_info[0].version
-
-print(F"The latest production version of the model \"{MLFLOW_MODEL_NAME}\" is {latest_production_version}")
 
 
-# Cite dataset:
+#check the latest version of the model
 
-# This notebook uses altered data from the National WIND Toolkit dataset provided by NREL, which is publicly available and cited as follows:
-# 
-# Draxl, C., B.M. Hodge, A. Clifton, and J. McCaa. 2015. Overview and Meteorological Validation of the Wind Integration National Dataset Toolkit (Technical Report, NREL/TP-5000-61740). Golden, CO: National Renewable Energy Laboratory.
-# 
-# Draxl, C., B.M. Hodge, A. Clifton, and J. McCaa. 2015. "The Wind Integration National Dataset (WIND) Toolkit." Applied Energy 151: 355366.
-# 
-# Lieberman-Cribbin, W., C. Draxl, and A. Clifton. 2014. Guide to Using the WIND Toolkit Validation Code (Technical Report, NREL/TP-5000-62595). Golden, CO: National Renewable Energy Laboratory.
-# 
-# King, J., A. Clifton, and B.M. Hodge. 2014. Validation of Power Output for the WIND Toolkit (Technical Report, NREL/TP-5D00-61714). Golden, CO: National Renewable Energy Laboratory.
-# 
-# And notebook reference here: https://docs.databricks.com/_extras/notebooks/source/mlflow/mlflow-model-registry-example.html
+model_version_infos = client.search_model_versions(F"name = '{MLFLOW_MODEL_NAME}'")
+last_model_version = max([model_version_info.version for model_version_info in model_version_infos])
+
+
+# set tags, alias, update and delete them
+# create "champion" alias for version 1 of model "wind-forecast-seq-model"
+client.set_registered_model_alias(MLFLOW_MODEL_NAME, "champion", last_model_version)
+
+# reassign the "Champion" alias to version 5
+#client.set_registered_model_alias(MLFLOW_MODEL_NAME, "Champion", '5')
+
+# get a model version by alias
+print(f"\n Model version alias: ",client.get_model_version_by_alias(MLFLOW_MODEL_NAME, "champion"))
+
+
+# delete the alias
+#client.delete_registered_model_alias(MLFLOW_MODEL_NAME, "Champion")
+
+
+# Set registered model tag
+client.set_registered_model_tag(MLFLOW_MODEL_NAME, "task", "classification")
+client.set_registered_model_tag(MLFLOW_MODEL_NAME, "author", "lisana.berberi@kit.edu")
+client.set_registered_model_tag(MLFLOW_MODEL_NAME, "framework", "tensorflow")
+# Delete registered model tag
+#client.delete_registered_model_tag(MLFLOW_MODEL_NAME, "task")
+
+# Set model version tag
+client.set_model_version_tag(MLFLOW_MODEL_NAME, last_model_version, "validation_status", "approved")
+#client.set_model_version_tag(MLFLOW_MODEL_NAME, new_model_version, "validation_status", "pending")
+# Delete model version tag
+#client.delete_model_version_tag(MLFLOW_MODEL_NAME, "1", "validation_status")
