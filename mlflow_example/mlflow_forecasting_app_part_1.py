@@ -20,13 +20,12 @@ print(f'Tensorflow version = {tf.__version__}\n')
 # full lifecycle of MLflow Models. It provides model lineage (which MLflow Experiment and Run produced the model), 
 # model versioning, stage transitions, annotations, and deployment management.
 # 
-# In this notebook, you use each of the MLflow Model Registry's components to develop and manage a production ML application. 
+# In this python script-part 1, you use each of the MLflow Model Registry's components to develop and manage a production ML application. 
 # This script covers the following topics:
 # * Log model experiments with MLflow
 # * Register models with the Model Registry
 # * Add model description and version the model stage transitions
-# * Search and discover models in the MR
-# * Archive and delete models
+# * Add tags and alias to models and models versions
 
 # ## 2.1 ML Application Example using MLFlow
 # ## Load the dataset
@@ -220,12 +219,6 @@ with mlflow.start_run():
   import numpy as np
 
   # Assuming X_train is your input data (Pandas DataFrame or NumPy array)
-  #input_columns = [{"name": feature_name, "type": "double"} for feature_name in X_train.columns]
-  # Add more features to the input_columns list
-  #additional_features = ["wind_direction_00", "wind_speed_00", "wind_speed_08"]
-  #input_columns += [{"name": feature_name, "type": "double"} for feature_name in input_columns]
-
-  # Assuming X_train is your input data (Pandas DataFrame or NumPy array)
   input_columns = X_train.columns.tolist()
   output_columns = y_train
   print("input col", input_columns)
@@ -241,7 +234,7 @@ with mlflow.start_run():
   signature = ModelSignature(inputs=input_schema, outputs=output_schema)
 
   print("\nsignature", signature)
- #Save the Keras model as a TensorFlow SavedModel
+  #Save the Keras model as a TensorFlow SavedModel locally in your machine
   #model.save("my_keras_model")
 
   # Log the TensorFlow using mlflow.tensorflow.log_model
@@ -279,16 +272,11 @@ result = mlflow.register_model(
     f"runs:/{run_id}/artifacts/", MLFLOW_MODEL_NAME
 )
 
-
-
 ## Fetch the latest model from the Model Registry
-
 from mlflow.tracking.client import MlflowClient
 client = MlflowClient()
 
-
 #check the latest version of the model
-
 model_version_infos = client.search_model_versions(F"name = '{MLFLOW_MODEL_NAME}'")
 last_model_version = max([model_version_info.version for model_version_info in model_version_infos])
 
@@ -303,10 +291,8 @@ client.set_registered_model_alias(MLFLOW_MODEL_NAME, "champion", last_model_vers
 # get a model version by alias
 print(f"\n Model version alias: ",client.get_model_version_by_alias(MLFLOW_MODEL_NAME, "champion"))
 
-
 # delete the alias
 #client.delete_registered_model_alias(MLFLOW_MODEL_NAME, "Champion")
-
 
 # Set registered model tag
 client.set_registered_model_tag(MLFLOW_MODEL_NAME, "task", "classification")
